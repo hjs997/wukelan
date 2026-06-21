@@ -7,7 +7,7 @@ WORKDIR /usr/src/app
 # 优先复制依赖清单，利用 Docker 缓存加速构建
 COPY package*.json ./
 
-RUN apt-get update && apt-get install -y git
+RUN apk add --no-cache git
 # 安装生产环境依赖包
 RUN npm install --production
 
