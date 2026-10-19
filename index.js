@@ -1,23 +1,22 @@
-const mineflayer = require('mineflayer');
-const express = require('express');
 const fs = require('fs');
 const path = require('path');
 
-// 🛠️ 终极破解补丁：在容器运行时自动克隆 1.21 数据伪装成 26.3，彻底解决找不到数据与版本不匹配的问题
+// 🚨 【极其重要】必须在任何 require 之前完成补丁注入，否则会直接触发 unsupported protocol version 错误！
 try {
   const targetVer = '26.3';
-  const baseVer = '1.21';
+  const baseVer = '1.21'; // 用当前库已有的高版本作为数据母本
   
   const targetPath = path.join(__dirname, 'node_modules', 'minecraft-data', 'data', 'pc', targetVer);
   const basePath = path.join(__dirname, 'node_modules', 'minecraft-data', 'data', 'pc', baseVer);
 
-  // 如果没有 26.3 的数据目录，则复制一份 1.21 的
+  // 1. 如果没有 26.3 的数据目录，在启动前瞬间克隆一份 1.21 的数据
   if (!fs.existsSync(targetPath) && fs.existsSync(basePath)) {
-    console.log(`🛠️ 正在创建兼容目录: ${targetVer} (克隆自 ${baseVer})`);
+    console.log(`🛠️ 正在抢先创建兼容目录: ${targetVer} (克隆自 ${baseVer})`);
+    fs.mkdirSync(targetPath, { recursive: true });
     fs.cpSync(basePath, targetPath, { recursive: true });
   }
 
-  // 将 26.3 注入到 minecraft-data 的版本索引中
+  // 2. 将 26.3 强行注入到 minecraft-data 的版本索引中
   const versionsJsonPath = path.join(__dirname, 'node_modules', 'minecraft-data', 'data', 'common', 'versions.json');
   if (fs.existsSync(versionsJsonPath)) {
     const versions = JSON.parse(fs.readFileSync(versionsJsonPath, 'utf8'));
@@ -30,13 +29,19 @@ try {
         newConfig.versionString = targetVer;
         versions.push(newConfig);
         fs.writeFileSync(versionsJsonPath, JSON.stringify(versions, null, 2));
-        console.log(`✅ 成功将版本 ${targetVer} 注入 minecraft-data 索引！`);
+        console.log(`✅ 成功在加载前将版本 ${targetVer} 注入 minecraft-data 索引！`);
       }
     }
   }
 } catch (e) {
-  console.log('⚠️ 补丁注入警告:', e.message);
+  console.log('⚠️ 预处理补丁警告:', e.message);
 }
+
+// ---------------------------------------------------------
+// 上面的补丁跑完后，再安全地加载 mineflayer 和 express
+// ---------------------------------------------------------
+const mineflayer = require('mineflayer');
+const express = require('express');
 
 const app = express();
 app.get('/', (req, res) => {
@@ -55,7 +60,7 @@ function createBot() {
     host: 'join.wrd.kr', 
     port: 25006,                 
     username: 'worldhappy1',  
-    version: '26.3', // 👈 完美匹配服务器版本，配合上面的运行时补丁即可完美通过！
+    version: '26.3', // 完美对齐服务器版本，此时底层已经被我们骗过去了！
     physics: false 
   });
 
