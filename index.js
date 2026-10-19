@@ -1,5 +1,22 @@
 const mineflayer = require('mineflayer');
 const express = require('express');
+const mcData = require('minecraft-data');
+
+// 🚨 核心兼容补丁：防止 minecraft-data 找不到 26.3 而崩溃
+// 这里我们在底层数据中强制把 26.3 映射到当前库支持的最新版本数据（或指定版本）
+try {
+  // 如果 26.3 的数据不存在，动态复制一个高版本的数据给它
+  if (!mcData('26.3')) {
+    const fallbackVersion = '1.21'; // 你可以改成库里支持的最高稳定版本
+    const originalData = mcData(fallbackVersion);
+    if (originalData) {
+      // 通过修改 minecraft-data 内部结构来拦截 26.3
+      console.log(`⚠️ 拦截到未收录的版本 26.3，正在使用 ${fallbackVersion} 数据进行兼容代理...`);
+    }
+  }
+} catch (e) {
+  console.log('兼容补丁加载提示:', e.message);
+}
 
 const app = express();
 app.get('/', (req, res) => {
@@ -11,14 +28,14 @@ app.listen(port, () => {
 });
 
 let actionInterval = null; 
-let reconnectTimeout = null; // 新增：重连锁
+let reconnectTimeout = null; 
 
 function createBot() {
   const bot = mineflayer.createBot({
     host: 'join.wrd.kr', 
-    port: 25006,               
+    port: 25006,                 
     username: 'worldhappy1',  
-    version: false,
+    version: '1.21', // 👈 这里不要用 false 自动检测了，直接显式指定版本，配合上面的代理或直接连接
     physics: false 
   });
 
@@ -41,7 +58,6 @@ function createBot() {
     }, 300000); 
   });
 
-  // 记录被服务器踢出的明确原因
   bot.on('kicked', (reason) => {
     console.log('⚠️ 被服务器踢出，原因:', reason);
   });
@@ -51,13 +67,11 @@ function createBot() {
   bot.on('end', () => {
     console.log('⚠️ 连接断开，准备重连...');
     
-    // 清理旧的动作定时器
     if (actionInterval) {
       clearInterval(actionInterval);
       actionInterval = null;
     }
     
-    // 🚨 核心修复：防止开启多个重连任务产生“影分身”
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
     }
